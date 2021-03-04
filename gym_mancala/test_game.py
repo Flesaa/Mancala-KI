@@ -1,6 +1,6 @@
 from unittest import TestCase
 import numpy as np
-from mancala.game import Game
+from gym_mancala.game import Game
 
 
 class TestGame(TestCase):
