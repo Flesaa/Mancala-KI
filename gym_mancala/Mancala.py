@@ -1,22 +1,27 @@
 import numpy as np
-
-
-def __is_move_on_score_hole(index):
-    """Checks if the given move is on a score hole"""
-    return index == 6 or index == 13
+import mancalavars
 
 
 class Mancala:
     _default_board = np.array([4, 4, 4, 4, 4, 4, 0, 4, 4, 4, 4, 4, 4, 0])
     action_size = 12
 
-    def __init__(self, board=None, player_turn=None):
-        self._board = Mancala._default_board[:] if board is None else board
-        self._player_turn = True if player_turn is None else (player_turn == 1)
+    """
+    The state of the game is a numpy array
+    * Values are either 0 - 48
+    * Shape [NUM_CHNLS, 14]
+    0 - Batches
+    2 - Turn (0 - Player 1, 1 - Player 2)
+    3 - Invalid moves
+    5 - Game over
+    """
 
-    def turn_player(self):
-        """Check number of current player"""
-        return 1 if self._player_turn else 2
+    def __init__(self, board=None, size=14):
+        if board is None:
+            self._board = np.zeros((mancalavars.NUM_CHNL, size))
+            self._board[0] = self._default_board
+        else:
+            self._board = board
 
     def board(self):
         """Current game board"""
@@ -33,33 +38,33 @@ class Mancala:
 
     def __is_on_player_score_hole(self, index):
         """Checks if the given move is on the current players score hole"""
-        if self._player_turn and index == 6:
+        if self.which_turn() and index == 6:
             return True
-        elif not self._player_turn and index == 13:
+        elif not self.which_turn() and index == 13:
             return True
 
         return False
 
     def __is_move_on_players_side(self, index):
         """Checks if the move is on the current players side"""
-        if self._player_turn:
+        if self.which_turn():
             return 5 >= index >= 0
         else:
             return 12 >= index >= 7
 
     def winner(self):
         """Returns the winner player number, or 0 if the game isn't over"""
-        if not Mancala.is_game_over(self._board):
+        if not self.is_game_over():
             return 0
-        return 1 if self.score()[0] > self.score()[1] else 2
+        return 1 if self.score_boards()[0] > self.score_boards()[1] else 2
 
     def move(self, index):
         """Perform a move action on a given index, based on the current player"""
-        if Mancala.is_game_over(self._board):
-            return self.score()
+        if self.is_game_over():
+            return self.score_boards()
 
         if self.__is_legal_move(index):
-            return self.score()
+            return self.score_boards()
 
         steps = self._board[index]
         self._board[index] = 0
@@ -74,23 +79,23 @@ class Mancala:
             steps -= 1
 
         if not self.__is_on_player_score_hole(curr_index):
-            """Move ends in players gym_mancala can move again"""
-            return self.score()
+            """Move ends in players mancala can move again"""
+            return self.score_boards()
 
         """check if end move is on own side and on empty hole"""
         self.__capture_rule(curr_index)
 
-        if Mancala.is_an_side_empty(self._board):
+        if self.has_an_side_empty():
             self.__capture_all_stones_on_sides()
 
-        self._player_turn = not self._player_turn
-        return self.score()
+        self.switch_turn()
+
+        return self.score_boards()
 
     def clone(self):
         """Return a clone of the game object"""
         return Mancala(
-            self.board(),
-            self._player_turn
+            self.board()
         )
 
     def __get_opposite_side_index(self, index):
@@ -103,7 +108,7 @@ class Mancala:
             captures = 1 + self._board[opposite_side_index]
             self._board[index] = 0
             self._board[opposite_side_index] = 0
-            if self._player_turn:
+            if self.which_turn():
                 self._board[6] += captures
             else:
                 self._board[13] += captures
@@ -114,7 +119,7 @@ class Mancala:
         self._board[0:6] = 0
         self._board[7:13] = 0
 
-    def is_an_side_empty(self):
+    def has_an_side_empty(self):
         return sum(self._board[0:6]) == 0 or sum(self._board[7:13]) == 0
 
     def score_boards(self):
@@ -132,4 +137,10 @@ class Mancala:
         return board
 
     def is_game_over(self):
-        return Mancala.is_an_side_empty(self._board)
+        return self.has_an_side_empty()
+
+    def switch_turn(self):
+        self._board[mancalavars.TURN_CHNL] = 1 - self._board[mancalavars.TURN_CHNL]
+
+    def which_turn(self):
+        return int(np.max(self._board[mancalavars.TURN_CHNL]))
